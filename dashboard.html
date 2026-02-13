@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Outbound Co-Pilot — JS Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d2e;
+            --surface2: #242839;
+            --border: #2e3348;
+            --text: #e4e6f0;
+            --text-muted: #8b90a8;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.15);
+            --ai: #818cf8;
+            --trad: #f87171;
+            --green: #34d399;
+            --amber: #fbbf24;
+            --red: #f87171;
+            --card-bg: #1a1d2e;
+            --radius: 14px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+        [data-theme="light"] {
+            --bg: #f5f6fa;
+            --surface: #ffffff;
+            --surface2: #eef0f5;
+            --border: #dfe1ea;
+            --text: #1a1d27;
+            --text-muted: #6b6f85;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.08);
+            --ai: #6366f1;
+            --trad: #ef4444;
+            --green: #059669;
+            --amber: #d97706;
+            --red: #ef4444;
+            --card-bg: #ffffff;
+            --shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; transition: background 0.3s, color 0.3s; }
+        .app { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+
+        /* Top Bar */
+        .topbar { position: sticky; top: 0; z-index: 100; background: var(--surface); border-bottom: 1px solid var(--border); backdrop-filter: blur(16px); padding: 0 24px; }
+        .topbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 56px; }
+        .topbar-brand { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 10px; }
+        .topbar-brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .topbar-actions { display: flex; align-items: center; gap: 12px; }
+        .theme-toggle { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 14px; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; font-weight: 500; transition: all 0.15s; }
+        .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* Tab nav */
+        .tab-nav { display: flex; gap: 4px; overflow-x: auto; padding: 12px 0; }
+        .tab-btn { padding: 8px 18px; border-radius: 8px; border: none; background: transparent; color: var(--text-muted); font-size: 0.82rem; cursor: pointer; white-space: nowrap; transition: all 0.15s; font-weight: 500; }
+        .tab-btn:hover { background: var(--surface2); color: var(--text); }
+        .tab-btn.active { background: var(--accent); color: #fff; }
+
+        /* Hero */
+        .hero { padding: 48px 0 40px; }
+        .hero h1 { font-size: 2.4rem; font-weight: 800; letter-spacing: -1px; background: linear-gradient(135deg, var(--ai), var(--accent), #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero .sub { color: var(--text-muted); font-size: 0.9rem; margin-top: 6px; }
+        .verdict { margin-top: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+        .verdict::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--ai), var(--accent), #a78bfa); }
+        .verdict .tag { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--amber); font-weight: 700; margin-bottom: 10px; }
+        .verdict p { font-size: 0.95rem; line-height: 1.8; }
+        .verdict strong { color: var(--text); }
+
+        /* Metric grid */
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; margin: 28px 0; }
+        .m-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; box-shadow: var(--shadow); cursor: default; }
+        .m-card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 8px 32px rgba(99,102,241,0.12); }
+        .m-card .m-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 600; margin-bottom: 14px; }
+        .m-card .m-vals { display: flex; gap: 20px; align-items: baseline; }
+        .m-card .m-val { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .m-card .m-val.ai { color: var(--ai); }
+        .m-card .m-val.trad { color: var(--trad); }
+        .m-card .m-val-sub { font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-top: 2px; }
+        .m-card .m-badge { margin-top: 12px; font-size: 0.75rem; padding: 4px 12px; border-radius: 20px; display: inline-block; font-weight: 600; }
+        .m-badge.ai-w { background: rgba(99,102,241,0.12); color: var(--ai); }
+        .m-badge.trad-w { background: rgba(248,113,113,0.12); color: var(--trad); }
+        .m-badge.tie { background: rgba(139,144,168,0.12); color: var(--text-muted); }
+
+        /* Section panels */
+        .panel { display: none; }
+        .panel.active { display: block; }
+        .panel-section { margin-bottom: 32px; }
+        .panel-section h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+        .panel-section .s-tag { font-size: 0.68rem; padding: 4px 12px; border-radius: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .s-tag.critical { background: rgba(251,191,36,0.12); color: var(--amber); }
+        .s-tag.insight { background: rgba(99,102,241,0.12); color: var(--ai); }
+        .s-tag.data { background: rgba(139,144,168,0.12); color: var(--text-muted); }
+        .s-tag.action { background: rgba(52,211,153,0.12); color: var(--green); }
+        .panel-section .s-desc { color: var(--text-muted); font-size: 0.88rem; margin-bottom: 24px; line-height: 1.7; }
+
+        /* Charts */
+        .chart-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; margin-bottom: 20px; box-shadow: var(--shadow); }
+        .chart-card h3 { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 16px; }
+        .chart-card .chart-note { font-size: 0.8rem; color: var(--text-muted); margin-top: 14px; line-height: 1.65; }
+        .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 768px) { .chart-grid { grid-template-columns: 1fr; } }
+
+        /* Tables */
+        .tbl { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
+        .tbl th { text-align: left; padding: 12px 14px; background: var(--surface2); color: var(--text-muted); font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--border); }
+        .tbl td { padding: 11px 14px; border-bottom: 1px solid var(--border); }
+        .tbl tr:hover td { background: var(--accent-glow); }
+        .tbl .w-ai { color: var(--ai); font-weight: 600; }
+        .tbl .w-trad { color: var(--trad); font-weight: 600; }
+        .tbl .v-ai { color: var(--ai); }
+        .tbl .v-trad { color: var(--trad); }
+
+        /* Callout boxes */
+        .callout { border-radius: var(--radius); padding: 22px 26px; margin: 20px 0; border: 1px solid; }
+        .callout.c-amber { background: rgba(251,191,36,0.06); border-color: rgba(251,191,36,0.2); }
+        .callout.c-blue { background: rgba(99,102,241,0.06); border-color: rgba(99,102,241,0.2); }
+        .callout.c-green { background: rgba(52,211,153,0.06); border-color: rgba(52,211,153,0.2); }
+        .callout .c-title { font-weight: 700; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .callout.c-amber .c-title { color: var(--amber); }
+        .callout.c-blue .c-title { color: var(--ai); }
+        .callout.c-green .c-title { color: var(--green); }
+        .callout p { font-size: 0.88rem; line-height: 1.75; }
+
+        /* Touch mix bars */
+        .mix-bar { display: flex; height: 40px; border-radius: 10px; overflow: hidden; margin: 8px 0; font-size: 0.75rem; font-weight: 600; }
+        .mix-bar .seg { display: flex; align-items: center; justify-content: center; color: #fff; transition: width 0.6s ease; }
+        .mix-bar .calls { background: #6366f1; }
+        .mix-bar .email { background: #06b6d4; }
+        .mix-bar .linkedin { background: #8b5cf6; }
+        .mix-lbl { font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600; }
+
+        /* Correlation cards */
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0; }
+        .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; text-align: center; box-shadow: var(--shadow); }
+        .stat-card .big { font-size: 3rem; font-weight: 800; }
+        .stat-card .desc { font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; line-height: 1.6; }
+
+        /* Recs */
+        .rec-list { list-style: none; }
+        .rec-list li { padding: 18px 22px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 16px; box-shadow: var(--shadow); transition: border-color 0.2s; }
+        .rec-list li:hover { border-color: var(--accent); }
+        .rec-list .r-num { background: var(--accent); color: #fff; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.85rem; flex-shrink: 0; }
+        .rec-list .r-txt { font-size: 0.88rem; line-height: 1.75; }
+
+        /* Legend */
+        .legend { display: flex; gap: 20px; margin-bottom: 16px; font-size: 0.8rem; color: var(--text-muted); }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 4px; }
+        .legend-dot.ai { background: var(--ai); }
+        .legend-dot.trad { background: var(--trad); }
+
+        /* Links */
+        .ext-link { display: inline-flex; align-items: center; gap: 8px; padding: 12px 24px; background: var(--accent); color: #fff; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 0.88rem; margin-top: 20px; transition: all 0.15s; }
+        .ext-link:hover { opacity: 0.85; transform: translateY(-1px); }
+
+        /* Footer */
+        .footer { padding: 48px 0; text-align: center; color: var(--text-muted); font-size: 0.78rem; border-top: 1px solid var(--border); margin-top: 32px; }
+        .footer a { color: var(--ai); text-decoration: none; }
+
+        /* Animations */
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        @media (max-width: 640px) {
+            .hero h1 { font-size: 1.6rem; }
+            .metric-grid { grid-template-columns: 1fr 1fr; }
+            .stat-grid { grid-template-columns: 1fr; }
+        }
+        @media print {
+            .topbar { display: none; }
+            .panel { display: block !important; page-break-inside: avoid; }
+            .tab-nav { display: none; }
+            body { background: #fff; color: #1a1d27; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <div class="topbar-inner">
+        <div class="topbar-brand"><span class="dot"></span> AI Outbound Co-Pilot</div>
+        <div class="topbar-actions">
+            <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">Light Mode</button>
+        </div>
+    </div>
+</div>
+
+<div class="app">
+    <div class="hero">
+        <h1>Performance Analysis</h1>
+        <p class="sub">Oct 2025 — Feb 2026 &middot; 4-Month Pilot &middot; AI Personalised vs Generic Outbound</p>
+        <div class="verdict">
+            <div class="tag">The Bottom Line</div>
+            <p>The AI sequence's lower conversion rate <strong>(0.9% vs 1.5%)</strong> appears to be driven by a significant drop in rep follow-up effort: reps make <strong>41% fewer calls per prospect</strong> on the AI sequence. They're loading more prospects in and relying on personalised emails, but not calling at the same rate. Each AI prospect receives <strong>23% fewer total touches</strong> (3.13 vs 4.05). When the same 34 reps are compared on both sequences, they book meetings at an <strong>identical rate: 0.21 per active week.</strong></p>
+        </div>
+        <a class="ext-link" href="https://docs.google.com/spreadsheets/d/1PTYbqgDIUioEdc9BWDrhUvQHb2DwR3Y0yYWU7kdayFM" target="_blank">Open Full Spreadsheet →</a>
+    </div>
+
+    <nav class="tab-nav" id="tabNav"></nav>
+    <div id="metricGrid" class="metric-grid"></div>
+    <div id="panels"></div>
+</div>
+
+<div class="footer">
+    <p>AI Outbound Co-Pilot Analysis — Data sourced from Outreach sequence reports — Period: Oct 2025 – Feb 2026</p>
+    <p style="margin-top:8px"><a href="https://docs.google.com/spreadsheets/d/1PTYbqgDIUioEdc9BWDrhUvQHb2DwR3Y0yYWU7kdayFM" target="_blank">Full data in Google Sheets →</a></p>
+    <p style="margin-top:8px"><a href="index.html">View Original Dashboard →</a></p>
+</div>
+
+<script>
+// ============================================================
+// DATA LAYER — All metrics & weekly data in one place
+// ============================================================
+const DATA = {
+    ai: {
+        name: 'AI (Relevance AI)',
+        meetings: 51, opps: 106, revenue: 1620023, prospects: 5953,
+        emails: 7237, calls: 8704, linkedin: 2662, accounts: 4825,
+        closedWon: 5, closedRevenue: 81396,
+        openRate: 0.487, clickRate: 0.032, replyRate: 0.045, answerRate: 0.166,
+        positiveRate: 0.107, objectionRate: 0.718, unsubRate: 0.097, referralRate: 0.01,
+        replies: 206, engagementScore: 51,
+    },
+    trad: {
+        name: 'Traditional (Generic)',
+        meetings: 29, opps: 42, revenue: 916316, prospects: 1889,
+        emails: 1833, calls: 4685, linkedin: 1126, accounts: 1694,
+        closedWon: 16, closedRevenue: 467103,
+        openRate: 0.522, clickRate: 0.031, replyRate: 0.105, answerRate: 0.154,
+        positiveRate: 0.103, objectionRate: 0.778, unsubRate: 0.077, referralRate: 0.026,
+        replies: 117, engagementScore: 58,
+    },
+    weekly: [
+        {week:"2025-10-03",ai_reps:0,tr_reps:14,ai_mtgs:0,tr_mtgs:4,ai_prosp:0,tr_prosp:145,ai_calls:0,tr_calls:302,ai_touches:0,tr_touches:481},
+        {week:"2025-10-10",ai_reps:0,tr_reps:13,ai_mtgs:0,tr_mtgs:2,ai_prosp:0,tr_prosp:142,ai_calls:0,tr_calls:486,ai_touches:0,tr_touches:801},
+        {week:"2025-10-17",ai_reps:0,tr_reps:13,ai_mtgs:0,tr_mtgs:4,ai_prosp:0,tr_prosp:137,ai_calls:0,tr_calls:425,ai_touches:0,tr_touches:713},
+        {week:"2025-10-24",ai_reps:12,tr_reps:13,ai_mtgs:3,tr_mtgs:4,ai_prosp:135,tr_prosp:90,ai_calls:57,tr_calls:242,ai_touches:150,tr_touches:412},
+        {week:"2025-10-31",ai_reps:12,tr_reps:10,ai_mtgs:1,tr_mtgs:4,ai_prosp:175,tr_prosp:131,ai_calls:171,tr_calls:286,ai_touches:423,tr_touches:457},
+        {week:"2025-11-07",ai_reps:13,tr_reps:10,ai_mtgs:2,tr_mtgs:3,ai_prosp:262,tr_prosp:73,ai_calls:101,tr_calls:256,ai_touches:422,tr_touches:404},
+        {week:"2025-11-14",ai_reps:10,tr_reps:16,ai_mtgs:3,tr_mtgs:2,ai_prosp:100,tr_prosp:120,ai_calls:199,tr_calls:213,ai_touches:424,tr_touches:346},
+        {week:"2025-11-21",ai_reps:13,tr_reps:9,ai_mtgs:1,tr_mtgs:0,ai_prosp:772,tr_prosp:36,ai_calls:308,tr_calls:216,ai_touches:858,tr_touches:355},
+        {week:"2025-11-28",ai_reps:19,tr_reps:15,ai_mtgs:5,tr_mtgs:5,ai_prosp:263,tr_prosp:361,ai_calls:503,tr_calls:456,ai_touches:1023,tr_touches:765},
+        {week:"2025-12-05",ai_reps:11,tr_reps:16,ai_mtgs:1,tr_mtgs:5,ai_prosp:102,tr_prosp:354,ai_calls:372,tr_calls:739,ai_touches:705,tr_touches:1199},
+        {week:"2025-12-12",ai_reps:13,tr_reps:12,ai_mtgs:1,tr_mtgs:1,ai_prosp:58,tr_prosp:262,ai_calls:151,tr_calls:608,ai_touches:356,tr_touches:1027},
+        {week:"2025-12-19",ai_reps:8,tr_reps:18,ai_mtgs:0,tr_mtgs:3,ai_prosp:27,tr_prosp:254,ai_calls:16,tr_calls:407,ai_touches:46,tr_touches:671},
+        {week:"2025-12-26",ai_reps:3,tr_reps:4,ai_mtgs:0,tr_mtgs:1,ai_prosp:0,tr_prosp:0,ai_calls:0,tr_calls:39,ai_touches:22,tr_touches:68},
+        {week:"2026-01-02",ai_reps:13,tr_reps:0,ai_mtgs:1,tr_mtgs:0,ai_prosp:491,tr_prosp:0,ai_calls:238,tr_calls:0,ai_touches:750,tr_touches:0},
+        {week:"2026-01-09",ai_reps:30,tr_reps:16,ai_mtgs:5,tr_mtgs:2,ai_prosp:937,tr_prosp:110,ai_calls:989,tr_calls:516,ai_touches:2279,tr_touches:821},
+        {week:"2026-01-16",ai_reps:33,tr_reps:12,ai_mtgs:16,tr_mtgs:1,ai_prosp:1097,tr_prosp:33,ai_calls:1681,tr_calls:267,ai_touches:3553,tr_touches:470},
+        {week:"2026-01-23",ai_reps:24,tr_reps:8,ai_mtgs:1,tr_mtgs:1,ai_prosp:447,tr_prosp:3,ai_calls:1332,tr_calls:155,ai_touches:2390,tr_touches:243},
+        {week:"2026-01-30",ai_reps:31,tr_reps:5,ai_mtgs:5,tr_mtgs:0,ai_prosp:653,tr_prosp:0,ai_calls:1479,tr_calls:94,ai_touches:3232,tr_touches:154},
+        {week:"2026-02-06",ai_reps:21,tr_reps:8,ai_mtgs:4,tr_mtgs:1,ai_prosp:348,tr_prosp:57,ai_calls:758,tr_calls:179,ai_touches:1451,tr_touches:284},
+        {week:"2026-02-10",ai_reps:0,tr_reps:6,ai_mtgs:0,tr_mtgs:0,ai_prosp:0,tr_prosp:21,ai_calls:0,tr_calls:73,ai_touches:0,tr_touches:120},
+    ],
+    repTest: { aiWins: 16, tradWins: 14, ties: 4, totalReps: 34 },
+    phases: [
+        { name: 'Early', period: 'Oct-Nov', aiReps: 9, tradReps: 13, aiMtgsWk: 1.7, tradMtgsWk: 3.1, aiConv: '0.9%', tradConv: '2.3%', aiCpp: 0.78, tradCpp: 2.33 },
+        { name: 'Holiday', period: 'Dec', aiReps: 9, tradReps: 12, aiMtgsWk: 0.5, tradMtgsWk: 2.5, aiConv: '1.1%', tradConv: '1.1%', aiCpp: 2.88, tradCpp: 2.06 },
+        { name: 'Scaled', period: 'Jan-Feb', aiReps: 25, tradReps: 8, aiMtgsWk: 5.3, tradMtgsWk: 0.7, aiConv: '0.8%', tradConv: '2.2%', aiCpp: 1.63, tradCpp: 5.73 },
+    ],
+};
+
+// ============================================================
+// DERIVED METRICS — computed from raw data
+// ============================================================
+const CALC = {
+    pctToMeeting: (s) => (s.meetings / s.prospects * 100).toFixed(1) + '%',
+    oppsPerProspect: (s) => (s.opps / s.prospects * 100).toFixed(1) + '%',
+    oppsPerMeeting: (s) => (s.opps / s.meetings).toFixed(2),
+    pipelinePerMeeting: (s) => '$' + Math.round(s.revenue / s.meetings).toLocaleString(),
+    callsPerProspect: (s) => (s.calls / s.prospects).toFixed(2),
+    touchesPerProspect: (s) => ((s.calls + s.emails + s.linkedin) / s.prospects).toFixed(2),
+    closeRate: (s) => (s.closedWon / s.opps * 100).toFixed(1) + '%',
+    avgClosedDeal: (s) => s.closedWon > 0 ? '$' + Math.round(s.closedRevenue / s.closedWon).toLocaleString() : 'N/A',
+    callMix: (s) => { const t = s.calls + s.emails + s.linkedin; return Math.round(s.calls / t * 100); },
+    emailMix: (s) => { const t = s.calls + s.emails + s.linkedin; return Math.round(s.emails / t * 100); },
+    linkedinMix: (s) => { const t = s.calls + s.emails + s.linkedin; return 100 - Math.round(s.calls / t * 100) - Math.round(s.emails / t * 100); },
+};
+
+// ============================================================
+// METRIC CARDS CONFIG
+// ============================================================
+const METRICS = [
+    { label: 'Prospect-to-Meeting', ai: CALC.pctToMeeting(DATA.ai), trad: CALC.pctToMeeting(DATA.trad), winner: 'trad', badge: 'Traditional ~1.7x' },
+    { label: 'Reply Rate', ai: (DATA.ai.replyRate * 100).toFixed(1) + '%', trad: (DATA.trad.replyRate * 100).toFixed(1) + '%', winner: 'trad', badge: 'Traditional 2.3x' },
+    { label: 'Meetings / Rep / Week', ai: '0.21', trad: '0.21', winner: 'tie', badge: 'Identical' },
+    { label: 'Opps per Prospect', ai: CALC.oppsPerProspect(DATA.ai), trad: CALC.oppsPerProspect(DATA.trad), winner: 'trad', badge: 'Traditional +22%' },
+    { label: 'Opps per Meeting', ai: CALC.oppsPerMeeting(DATA.ai), trad: CALC.oppsPerMeeting(DATA.trad), winner: 'ai', badge: 'AI +43%' },
+    { label: 'Pipeline per Meeting', ai: CALC.pipelinePerMeeting(DATA.ai), trad: CALC.pipelinePerMeeting(DATA.trad), winner: 'tie', badge: 'Dead heat' },
+    { label: 'Calls per Prospect', ai: CALC.callsPerProspect(DATA.ai), trad: CALC.callsPerProspect(DATA.trad), winner: 'trad', badge: 'AI calls 41% less' },
+];
+
+// ============================================================
+// TAB / PANEL DEFINITIONS
+// ============================================================
+const TABS = [
+    { id: 'overview', label: 'Overview' },
+    { id: 'critical', label: 'Call Effort' },
+    { id: 'efficiency', label: 'Efficiency' },
+    { id: 'trends', label: 'Trends' },
+    { id: 'correlation', label: 'Correlation' },
+    { id: 'reptest', label: 'A/B Test' },
+    { id: 'recs', label: 'Next Steps' },
+];
+
+// ============================================================
+// RENDERING ENGINE
+// ============================================================
+function renderMetricCards() {
+    const grid = document.getElementById('metricGrid');
+    grid.innerHTML = METRICS.map(m => `
+        <div class="m-card fade-in">
+            <div class="m-label">${m.label}</div>
+            <div class="m-vals">
+                <div><div class="m-val ai">${m.ai}</div><div class="m-val-sub">AI</div></div>
+                <div><div class="m-val trad">${m.trad}</div><div class="m-val-sub">Traditional</div></div>
+            </div>
+            <span class="m-badge ${m.winner === 'ai' ? 'ai-w' : m.winner === 'trad' ? 'trad-w' : 'tie'}">${m.badge}</span>
+        </div>
+    `).join('');
+}
+
+function renderTabs() {
+    const nav = document.getElementById('tabNav');
+    nav.innerHTML = TABS.map((t, i) => `
+        <button class="tab-btn${i === 0 ? ' active' : ''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">${t.label}</button>
+    `).join('');
+}
+
+function switchTab(id) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === id));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + id));
+    // Reinitialize charts for the active panel
+    if (chartInitFns[id]) chartInitFns[id]();
+}
+
+function renderPanels() {
+    const container = document.getElementById('panels');
+    container.innerHTML = `
+        ${renderOverviewPanel()}
+        ${renderCriticalPanel()}
+        ${renderEfficiencyPanel()}
+        ${renderTrendsPanel()}
+        ${renderCorrelationPanel()}
+        ${renderRepTestPanel()}
+        ${renderRecsPanel()}
+    `;
+}
+
+function renderOverviewPanel() {
+    const ai = DATA.ai, tr = DATA.trad;
+    return `<div class="panel active" id="panel-overview">
+        <div class="panel-section">
+            <h2><span class="s-tag insight">Volume</span> Raw Numbers at a Glance</h2>
+            <p class="s-desc">Side-by-side volume comparison. The AI sequence processed 3.2x more prospects — so raw counts alone don't tell the full story. Use the Efficiency tab for rate-based comparisons.</p>
+            <table class="tbl">
+                <thead><tr><th>Metric</th><th>AI</th><th>Traditional</th><th>Ratio</th></tr></thead>
+                <tbody>
+                    <tr><td>Prospects Added</td><td class="v-ai">${ai.prospects.toLocaleString()}</td><td class="v-trad">${tr.prospects.toLocaleString()}</td><td>${(ai.prospects / tr.prospects).toFixed(1)}x</td></tr>
+                    <tr><td>Emails Delivered</td><td class="v-ai">${ai.emails.toLocaleString()}</td><td class="v-trad">${tr.emails.toLocaleString()}</td><td>${(ai.emails / tr.emails).toFixed(1)}x</td></tr>
+                    <tr><td>Outbound Calls</td><td class="v-ai">${ai.calls.toLocaleString()}</td><td class="v-trad">${tr.calls.toLocaleString()}</td><td>${(ai.calls / tr.calls).toFixed(1)}x</td></tr>
+                    <tr><td>LinkedIn Tasks</td><td class="v-ai">${ai.linkedin.toLocaleString()}</td><td class="v-trad">${tr.linkedin.toLocaleString()}</td><td>${(ai.linkedin / tr.linkedin).toFixed(1)}x</td></tr>
+                    <tr><td>Total Replies</td><td class="v-ai">${ai.replies}</td><td class="v-trad">${tr.replies}</td><td>${(ai.replies / tr.replies).toFixed(1)}x</td></tr>
+                    <tr><td>Meetings Booked</td><td class="v-ai">${ai.meetings}</td><td class="v-trad">${tr.meetings}</td><td>${(ai.meetings / tr.meetings).toFixed(1)}x</td></tr>
+                    <tr><td>Opportunities Created</td><td class="v-ai">${ai.opps}</td><td class="v-trad">${tr.opps}</td><td>${(ai.opps / tr.opps).toFixed(1)}x</td></tr>
+                    <tr><td>Pipeline Revenue</td><td class="v-ai">$${(ai.revenue / 1000).toFixed(0)}k</td><td class="v-trad">$${(tr.revenue / 1000).toFixed(0)}k</td><td>${(ai.revenue / tr.revenue).toFixed(1)}x</td></tr>
+                    <tr><td>Closed/Won</td><td class="v-ai">${ai.closedWon}</td><td class="v-trad">${tr.closedWon}</td><td>${(ai.closedWon / tr.closedWon).toFixed(1)}x</td></tr>
+                    <tr><td>Closed/Won Revenue</td><td class="v-ai">$${(ai.closedRevenue / 1000).toFixed(0)}k</td><td class="v-trad">$${(tr.closedRevenue / 1000).toFixed(0)}k</td><td>${(ai.closedRevenue / tr.closedRevenue).toFixed(1)}x</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+function renderCriticalPanel() {
+    const aiCpp = CALC.callsPerProspect(DATA.ai);
+    const trCpp = CALC.callsPerProspect(DATA.trad);
+    const aiEpp = (DATA.ai.emails / DATA.ai.prospects).toFixed(2);
+    const trEpp = (DATA.trad.emails / DATA.trad.prospects).toFixed(2);
+    const aiLpp = (DATA.ai.linkedin / DATA.ai.prospects).toFixed(2);
+    const trLpp = (DATA.trad.linkedin / DATA.trad.prospects).toFixed(2);
+    const aiTpp = CALC.touchesPerProspect(DATA.ai);
+    const trTpp = CALC.touchesPerProspect(DATA.trad);
+    const aiCallPct = CALC.callMix(DATA.ai);
+    const aiEmailPct = CALC.emailMix(DATA.ai);
+    const aiLiPct = CALC.linkedinMix(DATA.ai);
+    const trCallPct = CALC.callMix(DATA.trad);
+    const trEmailPct = CALC.emailMix(DATA.trad);
+    const trLiPct = CALC.linkedinMix(DATA.trad);
+
+    return `<div class="panel" id="panel-critical">
+        <div class="panel-section">
+            <h2><span class="s-tag critical">Critical</span> Reps Are Not Calling on the AI Sequence</h2>
+            <p class="s-desc">Reps on the AI sequence are substituting phone calls with AI-personalised emails rather than using them as an additional channel. Each prospect gets less total follow-up.</p>
+            <div class="chart-grid">
+                <div>
+                    <table class="tbl">
+                        <thead><tr><th>Metric</th><th>AI</th><th>Traditional</th><th>Change</th></tr></thead>
+                        <tbody>
+                            <tr><td>Calls per Prospect</td><td class="v-ai">${aiCpp}</td><td class="v-trad">${trCpp}</td><td style="color:var(--red);font-weight:700">-41%</td></tr>
+                            <tr><td>Emails per Prospect</td><td class="v-ai">${aiEpp}</td><td class="v-trad">${trEpp}</td><td style="color:var(--green)">+26%</td></tr>
+                            <tr><td>LinkedIn per Prospect</td><td class="v-ai">${aiLpp}</td><td class="v-trad">${trLpp}</td><td style="color:var(--red)">-25%</td></tr>
+                            <tr style="font-weight:700"><td>Total Touches per Prospect</td><td class="v-ai">${aiTpp}</td><td class="v-trad">${trTpp}</td><td style="color:var(--red)">-23%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div>
+                    <div class="mix-lbl">AI Sequence — Touch Mix</div>
+                    <div class="mix-bar">
+                        <div class="seg calls" style="width:${aiCallPct}%">Calls ${aiCallPct}%</div>
+                        <div class="seg email" style="width:${aiEmailPct}%">Email ${aiEmailPct}%</div>
+                        <div class="seg linkedin" style="width:${aiLiPct}%">LI ${aiLiPct}%</div>
+                    </div>
+                    <div class="mix-lbl" style="margin-top:18px">Traditional Sequence — Touch Mix</div>
+                    <div class="mix-bar">
+                        <div class="seg calls" style="width:${trCallPct}%">Calls ${trCallPct}%</div>
+                        <div class="seg email" style="width:${trEmailPct}%">Email ${trEmailPct}%</div>
+                        <div class="seg linkedin" style="width:${trLiPct}%">LI ${trLiPct}%</div>
+                    </div>
+                    <p style="font-size:0.8rem;color:var(--text-muted);margin-top:16px">Call share drops ~14 percentage points on AI. Email share increases ~15 points. Reps are replacing calls with emails, not adding emails on top.</p>
+                </div>
+            </div>
+            <div class="callout c-amber" style="margin-top:24px">
+                <div class="c-title">Why This Matters</div>
+                <p>AI's lower conversion may <strong>not be a content problem — it's a call discipline problem.</strong> The AI rep is busier (91.9 touches/week vs 47.8) but managing 3.2x more prospects, so each prospect gets less attention. More volume, less depth. If call effort were maintained at Traditional levels while also getting AI-personalised emails, conversion could improve significantly.</p>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderEfficiencyPanel() {
+    const rows = [
+        { m: 'Prospect-to-Meeting %', ai: CALC.pctToMeeting(DATA.ai), trad: CALC.pctToMeeting(DATA.trad), w: 'trad', wt: 'Traditional (~1.7x)', n: 'Traditional converts more prospects into meetings' },
+        { m: 'Reply Rate', ai: (DATA.ai.replyRate*100).toFixed(1)+'%', trad: (DATA.trad.replyRate*100).toFixed(1)+'%', w: 'trad', wt: 'Traditional (2.3x)', n: 'Traditional gets 2.3x more replies per email sent' },
+        { m: 'Open Rate', ai: (DATA.ai.openRate*100).toFixed(1)+'%', trad: (DATA.trad.openRate*100).toFixed(1)+'%', w: 'trad', wt: 'Traditional', n: 'Subject line engagement slightly higher on Traditional' },
+        { m: 'Positive Reply Rate', ai: (DATA.ai.positiveRate*100).toFixed(1)+'%', trad: (DATA.trad.positiveRate*100).toFixed(1)+'%', w: 'tie', wt: 'Tie', n: 'Of those who reply, same % are positive on both' },
+        { m: 'Click Rate', ai: (DATA.ai.clickRate*100).toFixed(1)+'%', trad: (DATA.trad.clickRate*100).toFixed(1)+'%', w: 'tie', wt: 'Tie', n: 'Identical link click engagement' },
+        { m: 'Opps per Prospect', ai: CALC.oppsPerProspect(DATA.ai), trad: CALC.oppsPerProspect(DATA.trad), w: 'trad', wt: 'Traditional (+22%)', n: `AI: ${DATA.ai.opps} opps from ${DATA.ai.prospects.toLocaleString()} prospects. Trad: ${DATA.trad.opps} from ${DATA.trad.prospects.toLocaleString()}` },
+        { m: 'Opps per Meeting', ai: CALC.oppsPerMeeting(DATA.ai), trad: CALC.oppsPerMeeting(DATA.trad), w: 'ai', wt: 'AI (+43%)', n: 'AI meetings generate more pipeline opportunities (attribution caveat)' },
+        { m: 'Pipeline per Meeting', ai: CALC.pipelinePerMeeting(DATA.ai), trad: CALC.pipelinePerMeeting(DATA.trad), w: 'tie', wt: 'Dead heat', n: 'Essentially identical dollar value pipeline per meeting booked' },
+        { m: 'Close Rate', ai: CALC.closeRate(DATA.ai), trad: CALC.closeRate(DATA.trad), w: 'trad', wt: 'Traditional*', n: '*AI opps are mostly <6 weeks old — premature comparison' },
+        { m: 'Avg Closed Deal', ai: CALC.avgClosedDeal(DATA.ai), trad: CALC.avgClosedDeal(DATA.trad), w: 'trad', wt: 'Traditional', n: 'Traditional closes larger deals (5 AI deals vs 16 Traditional)' },
+        { m: 'Mtgs per Rep per Week', ai: '0.21', trad: '0.21', w: 'tie', wt: 'Identical', n: 'Same reps, same meeting output per week — volume cancels conversion' },
+        { m: 'Touches per Rep per Week', ai: '91.9', trad: '47.8', w: 'ai', wt: 'AI (+92%)', n: 'AI reps are nearly 2x busier, but spread across 3.2x more prospects' },
+    ];
+
+    return `<div class="panel" id="panel-efficiency">
+        <div class="panel-section">
+            <h2><span class="s-tag insight">Efficiency</span> Rate-Based Comparison</h2>
+            <p class="s-desc">These metrics normalise for the fact that AI had 3.2x more prospects (${DATA.ai.prospects.toLocaleString()} vs ${DATA.trad.prospects.toLocaleString()}). Rates are the only fair basis for comparison.</p>
+            <table class="tbl">
+                <thead><tr><th>Metric</th><th>AI</th><th>Traditional</th><th>Winner</th><th>What It Means</th></tr></thead>
+                <tbody>${rows.map(r => `
+                    <tr>
+                        <td>${r.m}</td>
+                        <td>${r.ai}</td>
+                        <td>${r.trad}</td>
+                        <td class="${r.w === 'ai' ? 'w-ai' : r.w === 'trad' ? 'w-trad' : ''}" style="${r.w === 'tie' ? 'color:var(--text-muted)' : ''}">${r.wt}</td>
+                        <td style="color:var(--text-muted);font-size:0.78rem">${r.n}</td>
+                    </tr>
+                `).join('')}</tbody>
+            </table>
+            <div class="callout c-blue" style="margin-top:24px">
+                <div class="c-title">Summary</div>
+                <p><strong>Traditional wins top-of-funnel</strong> (getting prospects to reply and book meetings). <strong>Pipeline per meeting is now a dead heat</strong> (${CALC.pipelinePerMeeting(DATA.ai)} vs ${CALC.pipelinePerMeeting(DATA.trad)}). Per-rep meeting output is identical — more prospects and lower conversion cancel each other out.</p>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderTrendsPanel() {
+    return `<div class="panel" id="panel-trends">
+        <div class="panel-section">
+            <h2><span class="s-tag data">Trends</span> Week-on-Week Performance</h2>
+            <p class="s-desc">How both sequences performed across 20 weeks. Three distinct phases: Early (Oct-Nov), Holiday (Dec), and Scaled (Jan-Feb when AI expanded from ~12 to 30+ reps).</p>
+            <div class="legend">
+                <div class="legend-item"><div class="legend-dot ai"></div> AI Sequence</div>
+                <div class="legend-item"><div class="legend-dot trad"></div> Traditional Sequence</div>
+            </div>
+            <div class="chart-grid">
+                <div class="chart-card"><h3>Meetings Booked per Week</h3><canvas id="c-meetings"></canvas><p class="chart-note">AI meetings were minimal early on (Oct-Nov) with ~12 reps. The Jan scale-up to 30+ reps drove a spike — peaking at 16 meetings (Jan 16). Traditional tapered as reps migrated to AI.</p></div>
+                <div class="chart-card"><h3>Active Reps per Week</h3><canvas id="c-reps"></canvas><p class="chart-note">AI started with ~12 reps in late Oct and stayed flat through Dec. In Jan, adoption surged to 30+ as the team migrated. Traditional rep count mirrors this — dropping from 12-16 to single digits.</p></div>
+            </div>
+            <div class="chart-grid">
+                <div class="chart-card"><h3>Conversion Rate (Prospect-to-Meeting %)</h3><canvas id="c-conv"></canvas><p class="chart-note">Traditional's conversion has been consistently higher across nearly every week. Both show volatility (small prospect pools amplify swings), but the pattern is clear: Traditional converts a higher percentage into meetings.</p></div>
+                <div class="chart-card"><h3>Calls per Prospect per Week</h3><canvas id="c-cpp"></canvas><p class="chart-note">This is the key chart. AI reps consistently make fewer calls per prospect. The gap is widest during scale-up phases. When AI call effort occasionally approached Traditional levels (Dec), conversion rates converged.</p></div>
+            </div>
+            <h3 style="color:var(--text-muted);font-size:0.9rem;margin:24px 0 12px;font-weight:600;">Phase Summary</h3>
+            <table class="tbl">
+                <thead><tr><th>Phase</th><th>Period</th><th>AI Reps</th><th>Trad Reps</th><th>AI Mtgs/Wk</th><th>Trad Mtgs/Wk</th><th>AI Conv %</th><th>Trad Conv %</th><th>AI Calls/Prosp</th><th>Trad Calls/Prosp</th></tr></thead>
+                <tbody>${DATA.phases.map(p => `
+                    <tr><td><strong>${p.name}</strong></td><td>${p.period}</td><td>${p.aiReps}</td><td>${p.tradReps}</td><td>${p.aiMtgsWk}</td><td>${p.tradMtgsWk}</td><td>${p.aiConv}</td><td>${p.tradConv}</td><td>${p.aiCpp}</td><td>${p.tradCpp}</td></tr>
+                `).join('')}</tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+function renderCorrelationPanel() {
+    return `<div class="panel" id="panel-correlation">
+        <div class="panel-section">
+            <h2><span class="s-tag critical">Correlation</span> Call Effort vs Conversion — The Smoking Gun</h2>
+            <p class="s-desc">When AI reps maintained call effort at comparable levels to Traditional, did AI convert better? We looked at every week where both sequences had 20+ prospects.</p>
+            <div class="stat-grid">
+                <div class="stat-card">
+                    <div class="big" style="color:var(--green)">75%</div>
+                    <div class="desc"><strong>AI won 3 out of 4 weeks</strong> when reps maintained call effort (≥80% of Traditional's calls/prospect)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="big" style="color:var(--red)">88%</div>
+                    <div class="desc"><strong>Traditional won 7 out of 8 weeks</strong> when AI reps dropped call effort (<80% of Traditional's calls/prospect)</div>
+                </div>
+            </div>
+            <div class="chart-card">
+                <h3>Call Effort vs Conversion by Week</h3>
+                <canvas id="c-corr"></canvas>
+                <p class="chart-note">Each dot is one week. X-axis: AI call effort relative to Traditional (100% = same rate). Y-axis: whether AI or Traditional converted better. Blue dots above zero = AI won. Red dots below = Traditional won. Higher call effort correlates strongly with AI winning.</p>
+            </div>
+            <div class="callout c-amber">
+                <div class="c-title">Interpretation</div>
+                <p>There is a clear correlation between call effort and AI sequence performance. When reps actually call at a comparable rate on AI, the combination of personalised emails <strong>plus</strong> calls outperforms Traditional. When they rely on emails alone, Traditional wins. The AI emails are not the problem — the missing calls are.</p>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderRepTestPanel() {
+    const rt = DATA.repTest;
+    return `<div class="panel" id="panel-reptest">
+        <div class="panel-section">
+            <h2><span class="s-tag insight">A/B Test</span> Same Rep, Both Sequences (${rt.totalReps} Reps)</h2>
+            <p class="s-desc">${rt.totalReps} reps used both sequences — the fairest possible comparison. For each rep, we compared meetings per active week, conversion rate, and activity level.</p>
+            <div class="stat-grid">
+                <div class="stat-card" style="border-left: 4px solid var(--ai);">
+                    <div class="big" style="color:var(--ai)">${rt.aiWins}</div>
+                    <div class="desc">AI Wins (${Math.round(rt.aiWins / rt.totalReps * 100)}%)</div>
+                </div>
+                <div class="stat-card" style="border-left: 4px solid var(--trad);">
+                    <div class="big" style="color:var(--trad)">${rt.tradWins}</div>
+                    <div class="desc">Traditional Wins (${Math.round(rt.tradWins / rt.totalReps * 100)}%)</div>
+                </div>
+            </div>
+            <p style="text-align:center;margin-bottom:24px;color:var(--text-muted)">${rt.ties} Ties (${Math.round(rt.ties / rt.totalReps * 100)}%)</p>
+            <div class="chart-card">
+                <h3>Rep Verdict Distribution</h3>
+                <canvas id="c-rep-donut" style="max-height:300px"></canvas>
+                <p class="chart-note">The split is nearly even — ${rt.aiWins} performed better on AI, ${rt.tradWins} on Traditional, and ${rt.ties} tied. No sequence has a dominant edge at the individual rep level, reinforcing that results are driven by behaviour patterns (call effort), not the sequence itself.</p>
+            </div>
+            <table class="tbl" style="margin-top:20px">
+                <thead><tr><th>Metric (34 Both-Sequence Reps)</th><th>AI</th><th>Traditional</th><th>Insight</th></tr></thead>
+                <tbody>
+                    <tr><td>Total Meetings</td><td>38</td><td>41</td><td style="color:var(--text-muted);font-size:0.78rem">Slightly more on Traditional despite half the prospects</td></tr>
+                    <tr><td>Total Prospects</td><td>5,083</td><td>2,230</td><td style="color:var(--text-muted);font-size:0.78rem">AI reps processed 2.3x more prospects</td></tr>
+                    <tr><td>Prospect-to-Meeting %</td><td>0.7%</td><td>1.8%</td><td style="color:var(--text-muted);font-size:0.78rem">Traditional converts at 2.5x the rate</td></tr>
+                    <tr><td>Meetings per Active Week</td><td>0.21</td><td>0.21</td><td style="color:var(--text-muted);font-size:0.78rem">Identical outcome per rep per week</td></tr>
+                    <tr><td>Touches per Active Week</td><td>91.9</td><td>47.8</td><td style="color:var(--text-muted);font-size:0.78rem">AI reps do 92% more work/week across 3.2x more prospects</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>`;
+}
+
+function renderRecsPanel() {
+    const recs = [
+        { text: '<strong>Enforce call discipline on the AI sequence</strong> — mandate same calls-per-prospect targets as Traditional. Reps should treat AI emails as an enhancement to their calling, not a replacement.' },
+        { text: '<strong>Monitor per-prospect touch rates weekly</strong> — track calls/prospect and touches/prospect, not just total activity volume. A rep doing 90 touches/week means nothing if they\'re spread across 30 prospects at 3 touches each.' },
+        { text: '<strong>Re-evaluate after 4-6 weeks of enforced discipline</strong> — once call effort is normalised, we\'ll have a clean comparison of whether AI personalisation genuinely improves conversion on top of standard call effort.' },
+        { text: '<strong>Consider the optimal combination</strong> — AI personalised emails + Traditional call effort could be the best of both worlds. The data suggests AI does add value downstream (more pipeline per meeting), so combining AI\'s content with Traditional\'s execution cadence may be the winning formula.' },
+    ];
+    return `<div class="panel" id="panel-recs">
+        <div class="panel-section">
+            <h2><span class="s-tag action">Actions</span> Recommended Next Steps</h2>
+            <div class="callout c-green" style="margin-bottom:24px">
+                <div class="c-title">Overall Assessment</div>
+                <p>The AI sequence hasn't been given a fair test yet. Reps changed their behaviour — they stopped calling at the same rate — so we're comparing AI emails alone against Traditional emails plus full call effort. <strong>The technology isn't the bottleneck; the execution is.</strong> Fix the call discipline and we'll know whether AI personalisation actually moves the needle.</p>
+            </div>
+            <ol class="rec-list">${recs.map((r, i) => `
+                <li><span class="r-num">${i + 1}</span><div class="r-txt">${r.text}</div></li>
+            `).join('')}</ol>
+        </div>
+    </div>`;
+}
+
+// ============================================================
+// CHART ENGINE
+// ============================================================
+const chartInstances = {};
+const chartInitFns = {};
+
+function getChartColors() {
+    const s = getComputedStyle(document.documentElement);
+    return {
+        ai: s.getPropertyValue('--ai').trim(),
+        trad: s.getPropertyValue('--trad').trim(),
+        grid: s.getPropertyValue('--border').trim(),
+        text: s.getPropertyValue('--text-muted').trim(),
+        green: s.getPropertyValue('--green').trim(),
+        red: s.getPropertyValue('--red').trim(),
+    };
+}
+
+function makeLabels() {
+    return DATA.weekly.map(d => {
+        const date = new Date(d.week + 'T00:00:00');
+        return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+    });
+}
+
+function chartBase() {
+    const c = getChartColors();
+    return {
+        responsive: true,
+        maintainAspectRatio: true,
+        animation: { duration: 600, easing: 'easeOutQuart' },
+        plugins: { legend: { display: true, labels: { color: c.text, padding: 16, usePointStyle: true } } },
+        scales: {
+            x: { grid: { color: c.grid + '33' }, ticks: { color: c.text, font: { size: 10 } } },
+            y: { grid: { color: c.grid + '33' }, ticks: { color: c.text } },
+        },
+    };
+}
+
+function destroyChart(id) {
+    if (chartInstances[id]) { chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+chartInitFns.trends = function () {
+    const labels = makeLabels();
+    const c = getChartColors();
+    const base = chartBase();
+    const w = DATA.weekly;
+
+    destroyChart('c-meetings');
+    chartInstances['c-meetings'] = new Chart(document.getElementById('c-meetings'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'AI', data: w.map(d => d.ai_mtgs), backgroundColor: c.ai + 'bb', borderRadius: 4 },
+                { label: 'Traditional', data: w.map(d => d.tr_mtgs), backgroundColor: c.trad + 'bb', borderRadius: 4 },
+            ]
+        },
+        options: base,
+    });
+
+    destroyChart('c-reps');
+    chartInstances['c-reps'] = new Chart(document.getElementById('c-reps'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'AI', data: w.map(d => d.ai_reps), borderColor: c.ai, backgroundColor: c.ai + '15', fill: true, tension: 0.35, pointRadius: 3 },
+                { label: 'Traditional', data: w.map(d => d.tr_reps), borderColor: c.trad, backgroundColor: c.trad + '15', fill: true, tension: 0.35, pointRadius: 3 },
+            ]
+        },
+        options: base,
+    });
+
+    destroyChart('c-conv');
+    chartInstances['c-conv'] = new Chart(document.getElementById('c-conv'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'AI', data: w.map(d => d.ai_prosp > 0 ? +(d.ai_mtgs / d.ai_prosp * 100).toFixed(1) : null), borderColor: c.ai, tension: 0.35, pointRadius: 4, spanGaps: false },
+                { label: 'Traditional', data: w.map(d => d.tr_prosp > 0 ? +(d.tr_mtgs / d.tr_prosp * 100).toFixed(1) : null), borderColor: c.trad, tension: 0.35, pointRadius: 4, spanGaps: false },
+            ]
+        },
+        options: { ...base, scales: { ...base.scales, y: { ...base.scales.y, ticks: { ...base.scales.y.ticks, callback: v => v + '%' } } } },
+    });
+
+    destroyChart('c-cpp');
+    chartInstances['c-cpp'] = new Chart(document.getElementById('c-cpp'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                { label: 'AI', data: w.map(d => d.ai_prosp > 0 ? +(d.ai_calls / d.ai_prosp).toFixed(2) : null), borderColor: c.ai, tension: 0.35, pointRadius: 4, spanGaps: false },
+                { label: 'Traditional', data: w.map(d => d.tr_prosp > 20 ? +(d.tr_calls / d.tr_prosp).toFixed(2) : null), borderColor: c.trad, tension: 0.35, pointRadius: 4, spanGaps: false },
+            ]
+        },
+        options: base,
+    });
+};
+
+chartInitFns.correlation = function () {
+    const c = getChartColors();
+    const base = chartBase();
+    const corrData = DATA.weekly
+        .filter(d => d.ai_reps > 0 && d.tr_reps > 0 && d.ai_prosp >= 20 && d.tr_prosp >= 20)
+        .map(d => {
+            const trCpp = d.tr_calls / d.tr_prosp;
+            const aiCpp = d.ai_calls / d.ai_prosp;
+            const effort = trCpp > 0 ? (aiCpp / trCpp * 100) : 0;
+            const aiConv = d.ai_mtgs / d.ai_prosp * 100;
+            const trConv = d.tr_mtgs / d.tr_prosp * 100;
+            return { x: effort, y: aiConv - trConv, label: d.week, aiWon: aiConv > trConv };
+        });
+
+    destroyChart('c-corr');
+    chartInstances['c-corr'] = new Chart(document.getElementById('c-corr'), {
+        type: 'scatter',
+        data: {
+            datasets: [{
+                label: 'Week',
+                data: corrData,
+                backgroundColor: corrData.map(d => d.aiWon ? c.ai + 'cc' : c.trad + 'cc'),
+                pointRadius: 11,
+                pointHoverRadius: 14,
+            }]
+        },
+        options: {
+            ...base,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(26,29,46,0.95)',
+                    callbacks: {
+                        label: (ctx) => {
+                            const d = corrData[ctx.dataIndex];
+                            return [`Week: ${d.label}`, `Call effort: ${d.x.toFixed(0)}% of Traditional`, `Conv advantage: ${d.y > 0 ? '+' : ''}${d.y.toFixed(1)}%`];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { ...base.scales.x, title: { display: true, text: 'AI Call Effort (% of Traditional)', color: c.text }, ticks: { ...base.scales.x.ticks, callback: v => v + '%' } },
+                y: { ...base.scales.y, title: { display: true, text: 'AI Conversion Advantage (pp)', color: c.text }, ticks: { ...base.scales.y.ticks, callback: v => (v > 0 ? '+' : '') + v + '%' } },
+            }
+        },
+    });
+};
+
+chartInitFns.reptest = function () {
+    const c = getChartColors();
+    const rt = DATA.repTest;
+
+    destroyChart('c-rep-donut');
+    chartInstances['c-rep-donut'] = new Chart(document.getElementById('c-rep-donut'), {
+        type: 'doughnut',
+        data: {
+            labels: [`AI Wins (${rt.aiWins})`, `Traditional Wins (${rt.tradWins})`, `Ties (${rt.ties})`],
+            datasets: [{ data: [rt.aiWins, rt.tradWins, rt.ties], backgroundColor: [c.ai + 'cc', c.trad + 'cc', c.text + '44'], borderWidth: 0 }]
+        },
+        options: {
+            responsive: true,
+            animation: { animateRotate: true, duration: 800 },
+            plugins: { legend: { position: 'bottom', labels: { color: c.text, padding: 20 } } },
+            cutout: '62%',
+        },
+    });
+};
+
+// ============================================================
+// THEME
+// ============================================================
+function toggleTheme() {
+    const body = document.documentElement;
+    const isDark = !body.hasAttribute('data-theme');
+    if (isDark) {
+        body.setAttribute('data-theme', 'light');
+        document.getElementById('themeBtn').textContent = 'Dark Mode';
+    } else {
+        body.removeAttribute('data-theme');
+        document.getElementById('themeBtn').textContent = 'Light Mode';
+    }
+    localStorage.setItem('theme', isDark ? 'light' : 'dark');
+    // Re-render active charts with new colors
+    const activeTab = document.querySelector('.tab-btn.active');
+    if (activeTab && chartInitFns[activeTab.dataset.tab]) {
+        chartInitFns[activeTab.dataset.tab]();
+    }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+(function init() {
+    // Restore theme
+    const saved = localStorage.getItem('theme');
+    if (saved === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.getElementById('themeBtn').textContent = 'Dark Mode';
+    }
+
+    renderTabs();
+    renderMetricCards();
+    renderPanels();
+})();
+</script>
+</body>
+</html>
