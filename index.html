@@ -344,10 +344,12 @@
                 <div class="chart-container">
                     <h3>Meetings Booked per Week</h3>
                     <canvas id="chartMeetings"></canvas>
+                    <p style="font-size:0.82rem;color:var(--text-muted);margin-top:12px;line-height:1.6">AI meetings were minimal in the early phase (Oct-Nov) when only ~12 reps were onboarded. The Jan scale-up to 30+ reps drove a clear spike — peaking at 16 meetings in the week of Jan 16. Traditional output has tapered off as reps shifted to the AI sequence, dropping to near-zero by late Jan.</p>
                 </div>
                 <div class="chart-container">
                     <h3>Active Reps per Week</h3>
                     <canvas id="chartReps"></canvas>
+                    <p style="font-size:0.82rem;color:var(--text-muted);margin-top:12px;line-height:1.6">The rep count tells the story of the rollout. AI started with ~12 reps in late Oct and stayed flat through Dec. In Jan, adoption surged to 30+ as the team migrated from Traditional. Traditional rep count mirrors this — dropping from a consistent 12-16 down to single digits as reps moved over.</p>
                 </div>
             </div>
 
@@ -355,10 +357,12 @@
                 <div class="chart-container">
                     <h3>Conversion Rate (Prospect-to-Meeting %)</h3>
                     <canvas id="chartConversion"></canvas>
+                    <p style="font-size:0.82rem;color:var(--text-muted);margin-top:12px;line-height:1.6">Traditional's conversion rate has been consistently higher than AI's across nearly every week. Both sequences show significant week-to-week volatility (small prospect pools amplify swings), but the pattern is clear: Traditional converts a higher percentage of prospects into meetings.</p>
                 </div>
                 <div class="chart-container">
                     <h3>Calls per Prospect per Week</h3>
                     <canvas id="chartCallsPerProspect"></canvas>
+                    <p style="font-size:0.82rem;color:var(--text-muted);margin-top:12px;line-height:1.6">This is the key chart. AI reps consistently make fewer calls per prospect than Traditional reps. The gap is widest during the early phase and the Jan scale-up, when large batches of new prospects were loaded but call effort didn't keep pace. When AI call effort occasionally approached Traditional levels (e.g. Dec), conversion rates converged.</p>
                 </div>
             </div>
 
@@ -398,6 +402,7 @@
             <div class="chart-container">
                 <h3>Call Effort vs Conversion by Week</h3>
                 <canvas id="chartCorrelation"></canvas>
+                <p style="font-size:0.82rem;color:var(--text-muted);margin-top:12px;line-height:1.6">Each dot is one week. The X-axis shows how much effort AI reps put into calling relative to Traditional (100% = same rate). The Y-axis shows whether AI or Traditional converted better that week. Blue dots (above zero) = AI won. Red dots (below zero) = Traditional won. The pattern is clear: dots on the right side (higher call effort) tend to be blue, dots on the left (lower call effort) tend to be red.</p>
             </div>
 
             <div class="callout amber">
@@ -433,6 +438,7 @@
             <div class="chart-container">
                 <h3>Rep Verdict Distribution</h3>
                 <canvas id="chartRepVerdicts" style="max-height:300px"></canvas>
+                <p style="font-size:0.82rem;color:var(--text-muted);margin-top:12px;line-height:1.6">Each of the 34 reps who used both sequences was scored on meetings per active week, conversion rate, and activity level. The split is nearly even — 16 performed better on AI, 14 on Traditional, and 4 were tied. No sequence has a dominant edge at the individual rep level, reinforcing that the overall results are driven by behaviour patterns (call effort), not the sequence itself.</p>
             </div>
 
             <table class="data-table" style="margin-top:20px">
